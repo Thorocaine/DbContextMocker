@@ -69,13 +69,13 @@
     <None Include="packages.config" />
   </ItemGroup>
   <ItemGroup>
-    <ProjectReference Include="..\DbContextMocker\DbContextMocker.csproj">
-      <Project>{6366d101-5bf9-4676-92b8-48c7e2b4daa7}</Project>
-      <Name>DbContextMocker</Name>
-    </ProjectReference>
+    <Service Include="{82A7F48D-3B50-4B1E-B82E-3ADA8210C358}" />
   </ItemGroup>
   <ItemGroup>
-    <Service Include="{82A7F48D-3B50-4B1E-B82E-3ADA8210C358}" />
+    <ProjectReference Include="..\DbContextMocker\DbContextMocker.csproj">
+      <Project>{ed878a01-3521-45e9-8324-5a9403cd1771}</Project>
+      <Name>DbContextMocker</Name>
+    </ProjectReference>
   </ItemGroup>
   <Import Project="$(MSBuildToolsPath)\Microsoft.CSharp.targets" />
   <!-- To modify your build process, add your task inside one of the targets below and uncomment it. 
