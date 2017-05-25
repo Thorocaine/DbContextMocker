@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections;
 using System.Collections.Generic;
+using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using System.Data.Entity;
 using System.Data.Entity.Infrastructure;
@@ -44,6 +45,7 @@ namespace DbContextMocker
 
         void ConfigureDataSet(DataSet dataSet)
         {
+            dataSet.ConfigureForignKeys(dataSets);
             var property = dataSet.GetContextProperty<TDbContext>();
             property.SetValue(mockContext.Object, dataSet.CreateDbSet());
         }
@@ -58,11 +60,14 @@ namespace DbContextMocker
         public abstract void AddData(IEnumerable<object> data);
         public abstract object CreateDbSet();
         public abstract PropertyInfo GetContextProperty<TDbContext>();
+        public abstract void ConfigureForignKeys(IEnumerable<DataSet> allDataSets);
+        public abstract object GetItemByKey(object value);
+        public abstract void AddNavigationCollectionData<N>(object keyValue, N dataItem);
     }
 
     class DataSet<T> : DataSet where T : class
     {
-        readonly List<T> dataList = new List<T>();
+       protected readonly List<T> dataList = new List<T>();
         
         public Mock<IDbSet<T>> MockDbSet { get; }= new Mock<IDbSet<T>>();
 
@@ -88,6 +93,52 @@ namespace DbContextMocker
         {
             var property = typeof(TDbContext).GetProperties().First(p => p.PropertyType == typeof(IDbSet<T>));
             return property;
+        }
+
+        public override void ConfigureForignKeys(IEnumerable<DataSet> allDataSets)
+        {
+            var query = from p in DataType.GetProperties()
+                        from a in p.GetCustomAttributes(true)
+                        where a is ForeignKeyAttribute
+                        select new {Property = p, ForeignKey = (ForeignKeyAttribute) a};
+            foreach (var forignKey in query)
+            {
+                var navigationField = DataType.GetFields().FirstOrDefault(p => p.Name == forignKey.ForeignKey.Name);
+                var matchedDataSet = allDataSets.FirstOrDefault(d => d.DataType == navigationField.FieldType);
+                if (matchedDataSet == null) continue;
+                foreach (var dataItem in dataList)
+                {
+                    var forignId = forignKey.Property.GetValue(dataItem);
+                    navigationField.SetValue(dataItem, matchedDataSet.GetItemByKey(forignId));
+                    matchedDataSet.AddNavigationCollectionData<T>(forignId, dataItem);
+                }
+            }
+        }
+
+        public override object GetItemByKey(object value)
+        {
+            var query = from p in DataType.GetProperties()
+                        from a in p.GetCustomAttributes(true)
+                        where a is KeyAttribute
+                        select p;
+            var keyProperty = query.FirstOrDefault();
+            if (keyProperty == null) return null;
+            var dataItem = dataList.FirstOrDefault(i => keyProperty.GetValue(i).Equals(value));
+            return dataItem;
+        }
+
+        public override void AddNavigationCollectionData<N>(object keyValue, N dataItemToAdd)
+        {
+            var collectionField = DataType.GetFields().FirstOrDefault(f => f.FieldType == typeof(ICollection<N>));
+            var dataItem = GetItemByKey(keyValue);
+            if (collectionField == null || dataItem == null) return;
+            var collection = collectionField.GetValue(dataItem) as List<N>;
+            if (collection == null)
+            {
+                collection = new List<N>();
+                collectionField.SetValue(dataItem, collection);
+            }
+            collection.Add(dataItemToAdd);
         }
     }
 

@@ -1,5 +1,4 @@
 ﻿<Project Sdk="Microsoft.NET.Sdk">
-
   <PropertyGroup>
     <TargetFramework>net45</TargetFramework>
     <Version>0.1.0</Version>
@@ -10,10 +9,10 @@
     <Copyright>2017</Copyright>
     <NeutralLanguage>en</NeutralLanguage>
   </PropertyGroup>
-
   <ItemGroup>
     <PackageReference Include="EntityFramework" Version="6.0.0" />
-    <PackageReference Include="Moq" Version="4.0.10827" />
+    <PackageReference Include="Moq">
+      <Version>4.7.0</Version>
+    </PackageReference>
   </ItemGroup>
-
 </Project>
