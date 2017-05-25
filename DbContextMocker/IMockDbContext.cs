@@ -99,13 +99,13 @@ namespace DbContextMocker
                         select new {Property = p, ForeignKey = (ForeignKeyAttribute) a};
             foreach (var forignKey in query)
             {
-                var navigationField = DataType.GetFields().FirstOrDefault(p => p.Name == forignKey.ForeignKey.Name);
-                var matchedDataSet = allDataSets.FirstOrDefault(d => d.DataType == navigationField.FieldType);
+                var navigationProperty = DataType.GetProperties().FirstOrDefault(p => p.Name == forignKey.ForeignKey.Name);
+                var matchedDataSet = allDataSets.FirstOrDefault(d => d.DataType == navigationProperty.PropertyType);
                 if (matchedDataSet == null) continue;
                 foreach (var dataItem in DataList)
                 {
                     var forignId = forignKey.Property.GetValue(dataItem);
-                    navigationField.SetValue(dataItem, matchedDataSet.GetItemByKey(forignId));
+                    navigationProperty.SetValue(dataItem, matchedDataSet.GetItemByKey(forignId));
                     matchedDataSet.AddNavigationCollectionData(forignId, dataItem);
                 }
             }
@@ -125,14 +125,14 @@ namespace DbContextMocker
 
         public override void AddNavigationCollectionData<TNavigation>(object keyValue, TNavigation dataItemToAdd)
         {
-            var collectionField = DataType.GetFields().FirstOrDefault(f => f.FieldType == typeof(ICollection<TNavigation>));
+            var collectionProperty = DataType.GetProperties().FirstOrDefault(f => f.PropertyType == typeof(ICollection<TNavigation>));
             var dataItem = GetItemByKey(keyValue);
-            if (collectionField == null || dataItem == null) return;
-            var collection = collectionField.GetValue(dataItem) as List<TNavigation>;
+            if (collectionProperty == null || dataItem == null) return;
+            var collection = collectionProperty.GetValue(dataItem) as List<TNavigation>;
             if (collection == null)
             {
                 collection = new List<TNavigation>();
-                collectionField.SetValue(dataItem, collection);
+                collectionProperty.SetValue(dataItem, collection);
             }
             collection.Add(dataItemToAdd);
         }

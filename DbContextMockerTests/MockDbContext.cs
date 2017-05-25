@@ -19,10 +19,10 @@ namespace DbContextMockerTests
         };
         readonly Dog[] dogs =
         {
-            new Dog{Id = 1, Name = "AA", PersonId = 1},
-            new Dog{Id = 2, Name = "BB", PersonId = 2},
-            new Dog{Id = 3, Name = "CC", PersonId = 1},
-            new Dog{Id = 4, Name = "DD", PersonId = 2},
+            new Dog{Id = 1, Name = "AA", PersonId = 1, FoodId = 1},
+            new Dog{Id = 2, Name = "BB", PersonId = 2, FoodId = 2},
+            new Dog{Id = 3, Name = "CC", PersonId = 1, FoodId = 1},
+            new Dog{Id = 4, Name = "DD", PersonId = 2, FoodId = 2}
         };
 
         readonly TestDbContext db;
@@ -116,7 +116,7 @@ namespace DbContextMockerTests
         public int Id { get; set; }
         public string Name { get; set; }
 
-        public ICollection<Dog> Dogs;
+        public ICollection<Dog> Dogs { get; set; }
     }
 
     public class Dog
@@ -128,6 +128,18 @@ namespace DbContextMockerTests
         [ForeignKey(nameof(Person))]
         public int PersonId { get; set; }
 
-        public Person Person;
+        [ForeignKey(nameof(Food))]
+        public int FoodId { get; set; }
+        
+        public Person Person { get; set; }
+        public Food Food { get; set; }
+    }
+
+    public class Food
+    {
+        [Key]
+        public int Id { get; set; }
+
+        public string Name { get; set; }
     }
 }
