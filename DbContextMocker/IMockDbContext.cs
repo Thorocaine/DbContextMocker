@@ -1,15 +1,11 @@
 ﻿using System;
-using System.Collections;
 using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 using System.Data.Entity;
 using System.Data.Entity.Infrastructure;
-using System.Dynamic;
 using System.Linq;
-using System.Linq.Expressions;
 using System.Reflection;
-using System.Runtime.InteropServices;
 using Moq;
 
 namespace DbContextMocker
@@ -20,7 +16,7 @@ namespace DbContextMocker
         
         readonly Mock<TDbContext> mockContext = new Mock<TDbContext>();
         
-        public MockDbContext<TDbContext> Add<T>(IEnumerable<T> entityData, params Action<T>[] confgirations) where T : class
+        public MockDbContext<TDbContext> Add<T>(IEnumerable<T> entityData) where T : class
         {
             var dataSet = dataSets.SingleOrDefault(x => x.DataType == typeof(T));
             if (dataSet == null)
@@ -62,12 +58,12 @@ namespace DbContextMocker
         public abstract PropertyInfo GetContextProperty<TDbContext>();
         public abstract void ConfigureForignKeys(IEnumerable<DataSet> allDataSets);
         public abstract object GetItemByKey(object value);
-        public abstract void AddNavigationCollectionData<N>(object keyValue, N dataItem);
+        public abstract void AddNavigationCollectionData<TNavigation>(object keyValue, TNavigation dataItem);
     }
 
     class DataSet<T> : DataSet where T : class
     {
-       protected readonly List<T> dataList = new List<T>();
+       protected readonly List<T> DataList = new List<T>();
         
         public Mock<IDbSet<T>> MockDbSet { get; }= new Mock<IDbSet<T>>();
 
@@ -75,13 +71,13 @@ namespace DbContextMocker
 
         public override void AddData(IEnumerable<object> data)
         {
-            dataList.AddRange(data.Where(d => d is T).Cast<T>());
+            DataList.AddRange(data.Where(d => d is T).Cast<T>());
         }
         
         public override object CreateDbSet()
         {
-            var queriable = dataList.AsQueryable();
-            MockDbSet.As<IDbAsyncEnumerable<T>>().Setup(m => m.GetAsyncEnumerator()).Returns(new TestDbAsyncEnumerator<T>(dataList.GetEnumerator()));
+            var queriable = DataList.AsQueryable();
+            MockDbSet.As<IDbAsyncEnumerable<T>>().Setup(m => m.GetAsyncEnumerator()).Returns(new TestDbAsyncEnumerator<T>(DataList.GetEnumerator()));
             MockDbSet.As<IQueryable<T>>().Setup(m => m.Provider).Returns(new TestDbAsyncQueryProvider<T>(queriable.Provider));
             MockDbSet.As<IQueryable<T>>().Setup(m => m.Expression).Returns(queriable.Expression);
             MockDbSet.As<IQueryable<T>>().Setup(m => m.ElementType).Returns(queriable.ElementType);
@@ -106,11 +102,11 @@ namespace DbContextMocker
                 var navigationField = DataType.GetFields().FirstOrDefault(p => p.Name == forignKey.ForeignKey.Name);
                 var matchedDataSet = allDataSets.FirstOrDefault(d => d.DataType == navigationField.FieldType);
                 if (matchedDataSet == null) continue;
-                foreach (var dataItem in dataList)
+                foreach (var dataItem in DataList)
                 {
                     var forignId = forignKey.Property.GetValue(dataItem);
                     navigationField.SetValue(dataItem, matchedDataSet.GetItemByKey(forignId));
-                    matchedDataSet.AddNavigationCollectionData<T>(forignId, dataItem);
+                    matchedDataSet.AddNavigationCollectionData(forignId, dataItem);
                 }
             }
         }
@@ -123,19 +119,19 @@ namespace DbContextMocker
                         select p;
             var keyProperty = query.FirstOrDefault();
             if (keyProperty == null) return null;
-            var dataItem = dataList.FirstOrDefault(i => keyProperty.GetValue(i).Equals(value));
+            var dataItem = DataList.FirstOrDefault(i => keyProperty.GetValue(i).Equals(value));
             return dataItem;
         }
 
-        public override void AddNavigationCollectionData<N>(object keyValue, N dataItemToAdd)
+        public override void AddNavigationCollectionData<TNavigation>(object keyValue, TNavigation dataItemToAdd)
         {
-            var collectionField = DataType.GetFields().FirstOrDefault(f => f.FieldType == typeof(ICollection<N>));
+            var collectionField = DataType.GetFields().FirstOrDefault(f => f.FieldType == typeof(ICollection<TNavigation>));
             var dataItem = GetItemByKey(keyValue);
             if (collectionField == null || dataItem == null) return;
-            var collection = collectionField.GetValue(dataItem) as List<N>;
+            var collection = collectionField.GetValue(dataItem) as List<TNavigation>;
             if (collection == null)
             {
-                collection = new List<N>();
+                collection = new List<TNavigation>();
                 collectionField.SetValue(dataItem, collection);
             }
             collection.Add(dataItemToAdd);

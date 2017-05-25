@@ -30,8 +30,8 @@ namespace DbContextMockerTests
         public MockDbContextTests()
         {
             var dbMock = MockDbContext.For<TestDbContext>();
-            dbMock.Add(people, p => p.Dogs = dogs.Where(d => d.PersonId == p.Id).ToList())
-                  .Add(dogs, d => d.Person = people.FirstOrDefault(p => p.Id == d.PersonId));
+            dbMock.Add(people)
+                  .Add(dogs);
             db = dbMock.Create();
         }
 
