@@ -27,10 +27,13 @@ namespace DbContextMockerTests
 
         readonly TestDbContext db;
 
-        public MockDbContextTests() => db = MockDbContext.For<TestDbContext>()
-            .Add(people, p => p.Dogs = dogs.Where(d => d.PersonId == p.Id).ToList())
-            .Add(dogs, d => d.Person = people.FirstOrDefault(p => p.Id == d.PersonId))
-            .Create();
+        public MockDbContextTests()
+        {
+            var dbMock = MockDbContext.For<TestDbContext>();
+            dbMock.Add(people, p => p.Dogs = dogs.Where(d => d.PersonId == p.Id).ToList())
+                  .Add(dogs, d => d.Person = people.FirstOrDefault(p => p.Id == d.PersonId));
+            db = dbMock.Create();
+        }
 
         [Fact]
         public void GetArrays()
