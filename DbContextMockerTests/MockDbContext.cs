@@ -30,8 +30,8 @@ namespace DbContextMockerTests
         public MockDbContextTests()
         {
             var dbMock = MockDbContext.For<TestDbContext>();
-            dbMock.Add(people)
-                  .Add(dogs);
+            dbMock.Add(x=>x.Persons, people)
+                  .Add(x =>x.Dogs,  dogs);
             db = dbMock.Create();
         }
 
@@ -106,8 +106,8 @@ namespace DbContextMockerTests
 
     public class TestDbContext : DbContext
     {
-        public IDbSet<Dog> Dogs { get; set; }
-        public IDbSet<Person> Persons { get; set; }
+        public virtual IDbSet<Dog> Dogs { get; set; }
+        public virtual IDbSet<Person> Persons { get; set; }
     }
 
     public class Person
@@ -116,7 +116,7 @@ namespace DbContextMockerTests
         public int Id { get; set; }
         public string Name { get; set; }
 
-        public ICollection<Dog> Dogs { get; set; }
+        public virtual ICollection<Dog> Dogs { get; set; }
     }
 
     public class Dog
@@ -131,8 +131,8 @@ namespace DbContextMockerTests
         [ForeignKey(nameof(Food))]
         public int FoodId { get; set; }
         
-        public Person Person { get; set; }
-        public Food Food { get; set; }
+        public virtual Person Person { get; set; }
+        public virtual Food Food { get; set; }
     }
 
     public class Food

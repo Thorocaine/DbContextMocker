@@ -5,6 +5,7 @@ using System.ComponentModel.DataAnnotations.Schema;
 using System.Data.Entity;
 using System.Data.Entity.Infrastructure;
 using System.Linq;
+using System.Linq.Expressions;
 using System.Reflection;
 using Moq;
 
@@ -12,16 +13,16 @@ namespace DbContextMocker
 {
     public class MockDbContext<TDbContext> where TDbContext : DbContext
     {
-        readonly ICollection<DataSet> dataSets = new List<DataSet>();
+        readonly ICollection<DataSet<TDbContext>> dataSets = new List<DataSet<TDbContext>>();
         
         readonly Mock<TDbContext> mockContext = new Mock<TDbContext>();
         
-        public MockDbContext<TDbContext> Add<T>(IEnumerable<T> entityData) where T : class
+        public MockDbContext<TDbContext> Add<T>(Expression<Func<TDbContext, IDbSet<T>>> expression, IEnumerable<T> entityData) where T : class
         {
             var dataSet = dataSets.SingleOrDefault(x => x.DataType == typeof(T));
             if (dataSet == null)
             {
-                dataSet = new DataSet<T>();
+                dataSet = new DataSet<TDbContext,T>(expression);
                 dataSets.Add(dataSet);
             }
             dataSet.AddData(entityData);
@@ -31,7 +32,8 @@ namespace DbContextMocker
         public TDbContext Create()
         {
             ConfigureDataSets();
-            return mockContext.Object;
+            var mockedObject = mockContext.Object;
+            return mockedObject;
         }
 
         void ConfigureDataSets()
@@ -39,59 +41,63 @@ namespace DbContextMocker
             foreach (var dataSet in dataSets) ConfigureDataSet(dataSet);
         }
 
-        void ConfigureDataSet(DataSet dataSet)
+        void ConfigureDataSet(DataSet<TDbContext> dataSet)
         {
             dataSet.ConfigureForignKeys(dataSets);
-            var property = dataSet.GetContextProperty<TDbContext>();
-            property.SetValue(mockContext.Object, dataSet.CreateDbSet());
+            var property = dataSet.GetContextProperty();
+            dataSet.CreateDbSet(mockContext, property);   
         }
     }
 
-    abstract class DataSet
+    abstract class DataSet<TDbContext> where TDbContext : DbContext
     {
         public Type DataType { get; }
         
         protected DataSet(Type dataType) => DataType = dataType;
 
         public abstract void AddData(IEnumerable<object> data);
-        public abstract object CreateDbSet();
-        public abstract PropertyInfo GetContextProperty<TDbContext>();
-        public abstract void ConfigureForignKeys(IEnumerable<DataSet> allDataSets);
+        public abstract void CreateDbSet(Mock<TDbContext> context, PropertyInfo property);
+        public abstract PropertyInfo GetContextProperty();
+        public abstract void ConfigureForignKeys(IEnumerable<DataSet<TDbContext>> allDataSets);
         public abstract object GetItemByKey(object value);
         public abstract void AddNavigationCollectionData<TNavigation>(object keyValue, TNavigation dataItem);
     }
 
-    class DataSet<T> : DataSet where T : class
+    class DataSet<TDbContext, T> : DataSet<TDbContext> where T : class where TDbContext : DbContext
     {
        protected readonly List<T> DataList = new List<T>();
-        
-        public Mock<IDbSet<T>> MockDbSet { get; }= new Mock<IDbSet<T>>();
+        private Expression<Func<TDbContext, IDbSet<T>>> expression;
 
-        public DataSet() : base(typeof(T)){}
+        //public Mock<IDbSet<T>> MockDbSet { get; }= new Mock<IDbSet<T>>();
+
+        public DataSet(Expression<Func<TDbContext, IDbSet<T>>> expression) : base(typeof(T)) => this.expression = expression;
 
         public override void AddData(IEnumerable<object> data)
         {
             DataList.AddRange(data.Where(d => d is T).Cast<T>());
         }
         
-        public override object CreateDbSet()
+        public override void CreateDbSet(Mock<TDbContext> context, PropertyInfo property)
         {
             var queriable = DataList.AsQueryable();
-            MockDbSet.As<IDbAsyncEnumerable<T>>().Setup(m => m.GetAsyncEnumerator()).Returns(new TestDbAsyncEnumerator<T>(DataList.GetEnumerator()));
-            MockDbSet.As<IQueryable<T>>().Setup(m => m.Provider).Returns(new TestDbAsyncQueryProvider<T>(queriable.Provider));
-            MockDbSet.As<IQueryable<T>>().Setup(m => m.Expression).Returns(queriable.Expression);
-            MockDbSet.As<IQueryable<T>>().Setup(m => m.ElementType).Returns(queriable.ElementType);
-            MockDbSet.As<IQueryable<T>>().Setup(m => m.GetEnumerator()).Returns(queriable.GetEnumerator());
-            return MockDbSet.Object;
+            var mockDbSet = new Mock<IDbSet<T>>();
+            mockDbSet.As<IDbAsyncEnumerable<T>>().Setup(m => m.GetAsyncEnumerator()).Returns(new TestDbAsyncEnumerator<T>(DataList.GetEnumerator()));
+            mockDbSet.As<IQueryable<T>>().Setup(m => m.Provider).Returns(new TestDbAsyncQueryProvider<T>(queriable.Provider));
+            mockDbSet.As<IQueryable<T>>().Setup(m => m.Expression).Returns(queriable.Expression);
+            mockDbSet.As<IQueryable<T>>().Setup(m => m.ElementType).Returns(queriable.ElementType);
+            mockDbSet.As<IQueryable<T>>().Setup(m => m.GetEnumerator()).Returns(queriable.GetEnumerator());
+            var dbSet = mockDbSet.Object;
+
+            context.SetupGet(expression).Returns(dbSet);
         }
 
-        public override PropertyInfo GetContextProperty<TDbContext>()
+        public override PropertyInfo GetContextProperty()
         {
             var property = typeof(TDbContext).GetProperties().First(p => p.PropertyType == typeof(IDbSet<T>));
             return property;
         }
 
-        public override void ConfigureForignKeys(IEnumerable<DataSet> allDataSets)
+        public override void ConfigureForignKeys(IEnumerable<DataSet<TDbContext>> allDataSets)
         {
             var query = from p in DataType.GetProperties()
                         from a in p.GetCustomAttributes(true)
